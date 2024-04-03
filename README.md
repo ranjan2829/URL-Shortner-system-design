@@ -1,7 +1,7 @@
 # Quant-Developers-Resources
 
 ## 🔥Hiring Process 
-#currently my exams goin on so break in Quant finance 
+
 
 1) `Mental Math/Speed Math/Logic/Numerical Tests`
 2) `BrainTeasers and Puzzles`
