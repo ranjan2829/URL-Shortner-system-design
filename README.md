@@ -1,1 +1,1 @@
-# CUDA
+# Algorithm Strategies for trading
