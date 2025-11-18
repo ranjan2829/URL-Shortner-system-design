@@ -2,4 +2,4 @@
 
 Below is the architecture diagram of the URL Shortener System:
 
-<img src="uRL.png" width="800" />
+<img src="image.png" width="800" />
