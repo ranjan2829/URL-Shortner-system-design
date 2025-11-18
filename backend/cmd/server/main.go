@@ -83,8 +83,29 @@ func main(){
 	log.Println("Server shutdown gracefully")
 	
 }
-
-
+func connectMongoDB(uri string) (*mongo.client,error){
+	ctx,cancel:=context.withTimeout(context.Background(),10*time.Second)
+	defer cancel()
+	clientOptions:=options.client().ApplyURI(uri)
+	client,err:=mongo.connect(ctx,clientOptions)
+	if err!=nil{
+		return nil,err
+	}
+	if err:=client.Ping(ctx,nil);err!=nil{
+		return nil,err
+	}
+	return client,nil
+}
+func connectRedis(address,password string,db int) *redis.Client{
+	client:=redis.newClient(&redis.options{
+		Addr:address,
+		Password:password,
+		DB:db,
+	})
+	if err:=client.ping(context.background());err!=nil{
+		return nil
+	}
+}
 
 
 
