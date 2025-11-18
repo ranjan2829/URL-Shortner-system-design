@@ -1,0 +1,36 @@
+# Environment variables
+.env
+.env.local
+.env*.local
+
+# OS Files
+.DS_Store
+.idea
+.vscode
+
+# Go
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+backend/*.test
+backend/coverage.txt
+
+# Frontend (Next.js)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel
+frontend/coverage/
+frontend/*.log
+frontend/.pnp
+frontend/.pnp.*
+frontend/*.tsbuildinfo
+
+# General
+*.log
+*.swp
+*.swo
+*~
