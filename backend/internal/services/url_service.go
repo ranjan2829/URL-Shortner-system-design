@@ -45,6 +45,9 @@ func (s *URLService) ShortenURL(ctx context.Context, originalURL string, expires
 	shortURL := &models.ShortURL{
 		OriginalURL: originalURL,
 		ShortCode:   shortCode,
+		CreatedAt:   time.Now(),
+		IsActive:    true,
+		ClickCount:  0,
 	}
 	if expiresIn != nil {
 		expiresAt := time.Now().Add(*expiresIn)

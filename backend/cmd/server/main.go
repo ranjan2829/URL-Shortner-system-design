@@ -13,100 +13,103 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/config"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/services"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/repository"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/handlers"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/middleware"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/routes"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/utils"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/validators"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/models"
-	"github.com/ranjanshahajishitole/url-shortener/backend/internal/database"
+	"github.com/ranjanshahajishitole/url-shortener/backend/internal/repository"
+	"github.com/ranjanshahajishitole/url-shortener/backend/internal/services"
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func main(){
-	if err:=godotenv.Load();err!=nil{
+func main() {
+	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found")
-
 	}
-	cfg,err:=config.LoadConfig()
-	if err!=nil{
-		log.Fatalf("Failed to load Config: %v",err)
-
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load Config: %v", err)
 	}
-	mongoClient,err:=connectMongoDB(cfg.MongoDB.URI)
-	if err!=nil{
-		log.Fatalf("Failed to connect to MongoDB: %v",err)
+	mongoClient, err := connectMongoDB(cfg.MongoDB.URI)
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
 	defer mongoClient.Disconnect(context.Background())
-	log.println("Connected to MongoDB")
+	log.Println("Connected to MongoDB")
 
-	redisClient:=connectRedis(cfg.Redis.Address,cfg.Redis.Password,cfg.Redis.DB)
-	if redisClient==nil{
-		log.Fatalf("Failed to connect to Redis: %v",err)
+	redisClient := connectRedis(cfg.Redis.Address, cfg.Redis.Password, cfg.Redis.DB)
+	if redisClient == nil {
+		log.Fatalf("Failed to connect to Redis")
 	}
-	mongoRepo,err:=repository.NewMongoRepository(mongoClient,cfg.MongoDB.Database,"short_urls")
-	if err!=nil{
-		log.Fatalf("Failed to create MongoDB repository: %v",err)
+	mongoRepo, err := repository.NewMongoRepository(mongoClient, cfg.MongoDB.Database, "short_urls")
+	if err != nil {
+		log.Fatalf("Failed to create MongoDB repository: %v", err)
 	}
-	healthRepo:=repository.newHealthCheckRepository(mongoClient,cfg.MongoDB.Database,"health_checks")
-	if err!=nil{
-		log.Fatalf("Failed to create Health Check repository: %v",err)
-	}
-	keyService:=services.NewKeyService(redisClient,cfg.KeyGenServiceURL,"short_code_queue")
-	urlService:=services.NewKeyService(mongorepo,keyService)
+	_ = repository.NewHealthCheckRepository(mongoClient, cfg.MongoDB.Database, "health_checks") // Reserved for future health check endpoints
+	keyService := services.NewKeyService(redisClient, cfg.KeyGenServiceURL, "short_code_queue")
+	urlService := services.NewURLService(mongoRepo, keyService)
 
-	router:=setupRouter(urlService)
-	server:=&http.Server{
-		Addr:fmt.Sprintf(":%s",cfg.Server.Port),
-		Handler:router,
+	router := setupRouter(urlService)
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
+		Handler: router,
 	}
-	go func(){
-		log.PrintF("Server starting on port %s",cfg.Server.Port)
-		if err:=server.ListenAndServe();err!=nil && err!=http.ErrServerClosed{
-			log.Fatalf("Failed to start server: %v",err)
+	go func() {
+		log.Printf("Server starting on port %s", cfg.Server.Port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
 		}
 	}()
-	quit:=make(chan os.Signal,1)
-	signal.Notify(quit,syscall.SIGINT,syscall.SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutting down the server...")
-	ctx,cancel:=context.withTimeout(context.Background(),5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err:=server shutdown(ctx);err!=nil{
-		log.Fatalf("server forced to shutdown:%v",err)
-
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("server forced to shutdown: %v", err)
 	}
 	log.Println("Server shutdown gracefully")
-	
 }
-func connectMongoDB(uri string) (*mongo.client,error){
-	ctx,cancel:=context.withTimeout(context.Background(),10*time.Second)
+
+// setupRouter configures all the routes for the application
+// This is where you'll add your API endpoints
+func setupRouter(urlService *services.URLService) *gin.Engine {
+	router := gin.Default()
+
+	// Add middleware (logging, CORS, etc.)
+	router.Use(middleware.Logger())
+
+	// API routes - you'll create handlers for these
+	// Example structure:
+	// api := router.Group("/api/v1")
+	// api.POST("/shorten", handlers.ShortenURL(urlService))
+	// api.GET("/:code", handlers.RedirectURL(urlService))
+	// api.GET("/:code/stats", handlers.GetStats(urlService))
+
+	return router
+}
+func connectMongoDB(uri string) (*mongo.Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	clientOptions:=options.client().ApplyURI(uri)
-	client,err:=mongo.connect(ctx,clientOptions)
-	if err!=nil{
-		return nil,err
+	clientOptions := options.Client().ApplyURI(uri)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, err
 	}
-	if err:=client.Ping(ctx,nil);err!=nil{
-		return nil,err
+	if err := client.Ping(ctx, nil); err != nil {
+		return nil, err
 	}
-	return client,nil
+	return client, nil
 }
-func connectRedis(address,password string,db int) *redis.Client{
-	client:=redis.newClient(&redis.options{
-		Addr:address,
-		Password:password,
-		DB:db,
+
+func connectRedis(address, password string, db int) *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     address,
+		Password: password,
+		DB:       db,
 	})
-	if err:=client.ping(context.background());err!=nil{
+	if err := client.Ping(context.Background()).Err(); err != nil {
 		return nil
 	}
+	return client
 }
-
-
-
-
