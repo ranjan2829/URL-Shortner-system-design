@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -35,14 +38,14 @@ func NewKeyService(redisClient *redis.Client, serviceURL, queueName string) *Key
 	}
 }
 func (s *KeyService) GetShortCode(ctx context.Context) (string, error) {
+	// Try to get from Redis queue first
 	shortCode, err := s.getFromRedisQueue(ctx)
 	if err == nil && shortCode != "" {
 		return shortCode, nil
 	}
-	shortCode, err = s.getFromKeyGenService(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get short code from key generation service: %w", err)
-	}
+	
+	// Generate locally instead of calling external service
+	shortCode = s.generateShortCode()
 	return shortCode, nil
 }
 func (s *KeyService) getFromRedisQueue(ctx context.Context) (string, error) {
@@ -86,4 +89,27 @@ func (s *KeyService) getFromKeyGenService(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get short code from key generation service: %s", response.Error)
 	}
 	return response.ShortCode, nil
+}
+
+// generateShortCode generates a random short code locally
+// Uses base64 URL-safe encoding for shorter codes (6-8 characters)
+func (s *KeyService) generateShortCode() string {
+	// Generate 6 random bytes
+	b := make([]byte, 6)
+	rand.Read(b)
+	
+	// Encode to base64 URL-safe string and take first 8 characters
+	encoded := base64.URLEncoding.EncodeToString(b)
+	// Remove padding and take 8 chars for short code
+	code := strings.TrimRight(encoded, "=")
+	if len(code) > 8 {
+		code = code[:8]
+	}
+	return code
+}
+
+// GenerateShortCode is a public method to generate a short code
+// Used by handlers for the /generate endpoint
+func (s *KeyService) GenerateShortCode() string {
+	return s.generateShortCode()
 }

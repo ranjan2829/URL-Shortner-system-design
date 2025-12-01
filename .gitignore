@@ -34,3 +34,5 @@ frontend/*.tsbuildinfo
 *.swp
 *.swo
 *~
+backend/server
+backend/cmd/server/server

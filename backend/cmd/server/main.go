@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/config"
+	"github.com/ranjanshahajishitole/url-shortener/backend/internal/handlers"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/middleware"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/repository"
 	"github.com/ranjanshahajishitole/url-shortener/backend/internal/services"
@@ -48,7 +49,7 @@ func main() {
 	keyService := services.NewKeyService(redisClient, cfg.KeyGenServiceURL, "short_code_queue")
 	urlService := services.NewURLService(mongoRepo, keyService)
 
-	router := setupRouter(urlService)
+	router := setupRouter(urlService, keyService)
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
 		Handler: router,
@@ -72,19 +73,24 @@ func main() {
 }
 
 // setupRouter configures all the routes for the application
-// This is where you'll add your API endpoints
-func setupRouter(urlService *services.URLService) *gin.Engine {
+func setupRouter(urlService *services.URLService, keyService *services.KeyService) *gin.Engine {
 	router := gin.Default()
 
 	// Add middleware (logging, CORS, etc.)
 	router.Use(middleware.Logger())
 
-	// API routes - you'll create handlers for these
-	// Example structure:
-	// api := router.Group("/api/v1")
-	// api.POST("/shorten", handlers.ShortenURL(urlService))
-	// api.GET("/:code", handlers.RedirectURL(urlService))
-	// api.GET("/:code/stats", handlers.GetStats(urlService))
+	// Create handlers
+	urlHandler := handlers.NewURLHandler(urlService)
+	keyHandler := handlers.NewKeyHandler(keyService)
+
+	// API routes
+	api := router.Group("/api/v1")
+	api.POST("/shorten", urlHandler.ShortenURL)
+	api.GET("/generate", keyHandler.GenerateKey) // Key generation endpoint
+	api.GET("/:code/stats", urlHandler.GetStats)
+
+	// Redirect route (should be last to avoid conflicts)
+	router.GET("/:code", urlHandler.RedirectURL)
 
 	return router
 }
